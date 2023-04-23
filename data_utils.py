@@ -72,9 +72,9 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
     def get_items_pair(self, audiopaths):
 
         soft_path, f0_path, spec_path, wave_path, spk_id = audiopaths[:5]
-        c, f0, uv = self.get_features(self, soft_path, f0_path)
-        spec, audio_norm = self.get_audio(self, wave_path, spec_path)
-        spk = self.get_sid(self, spk_id)
+        c, f0, uv = self.get_features(soft_path, f0_path)
+        spec, audio_norm = self.get_audio(wave_path, spec_path)
+        spk = self.get_sid(spk_id)
 
         # Ensure c and spec have similar lengths
         # truncate arrays to match the smaller length
@@ -110,7 +110,7 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
 
     def get_features(self, soft_path, f0_path):
         f0 = np.load(f0_path)
-        f0, uv = utils.interpolate_f0(f0_path)
+        f0, uv = utils.interpolate_f0(f0)
         f0 = torch.FloatTensor(f0)
         uv = torch.FloatTensor(uv)
 

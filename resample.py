@@ -20,7 +20,9 @@ def process(item):
         if peak > 1.0:
             wav = 0.98 * wav / peak
         wav2 = librosa.resample(wav, orig_sr=sr, target_sr=args.sr2)
-        wav2 /= max(wav2.max(), -wav2.min())
+        # 与目标采样率相同时，不进行归一化操作
+        if sr != args.sr2:
+            wav2 /= max(wav2.max(), -wav2.min())
         save_name = wav_name
         save_path2 = os.path.join(args.out_dir2, speaker, save_name)
         wavfile.write(

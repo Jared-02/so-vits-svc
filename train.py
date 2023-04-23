@@ -71,17 +71,17 @@ def run(rank, n_gpus, hps):
     torch.manual_seed(hps.train.seed)
     torch.cuda.set_device(rank)
     
+    collate_fn = TextAudioCollate()
     all_in_mem = hps.train.all_in_mem   # If you have enough memory, turn on this option to avoid disk IO and speed up training.
     train_dataset = TextAudioSpeakerLoader(hps.data.training_files, hps, all_in_mem=all_in_mem)
     train_sampler = DistributedBucketSampler(
         train_dataset,
         hps.train.batch_size,
-        [50,200,400,500,600,700,800,1000,1300],
-        # ignore items <=0.58s >=15.09s (unit: hop length)
+        [50,200,400,500,600,700,800,900,1000,1100,1200],
+        # ignore items <=0.58s >=13.93s (unit: hop length)
         num_replicas=n_gpus,
         rank=rank,
         shuffle=True)
-    collate_fn = TextAudioCollate()
 
     if all_in_mem:
         num_workers = 0
@@ -99,9 +99,9 @@ def run(rank, n_gpus, hps):
     if rank == 0:
         eval_dataset = TextAudioSpeakerLoader(hps.data.validation_files, hps, all_in_mem=all_in_mem)
         eval_loader = DataLoader(eval_dataset,
-                                 num_workers=num_workers,
+                                 num_workers=2,
                                  shuffle=False,
-                                 batch_size=hps.train.batch_size,
+                                 batch_size=2, # 此处 batch size 太大，无法在 tensorboard 面板查看到全部验证样本
                                  pin_memory=False,
                                  drop_last=False,
                                  collate_fn=collate_fn)
