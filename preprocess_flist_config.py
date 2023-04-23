@@ -28,44 +28,48 @@ if __name__ == "__main__":
     parser.add_argument("--source_dir", type=str, default="./dataset/44k", help="path to source dir")
     args = parser.parse_args()
     
+    rootpath = args.source_dir
+    all_items = []
+
     train = []
     val = []
     idx = 0
     spk_dict = {}
     spk_id = 0
-    for speaker in tqdm(os.listdir(args.source_dir)):
+    for speaker in tqdm(os.listdir(rootpath)):
         spk_dict[speaker] = spk_id
         spk_id += 1
-        wavs = ["/".join([args.source_dir, speaker, i]) for i in os.listdir(os.path.join(args.source_dir, speaker))]
-        new_wavs = []
-        for file in wavs:
-            if not file.endswith("wav"):
-                continue
-            if not pattern.match(file):
-                print(f"warning：文件名{file}中包含非字母数字下划线，可能会导致错误。（也可能不会）")
-            if get_wav_duration(file) < 0.3:
-                print("skip too short audio:", file)
-                continue
-            new_wavs.append(file)
-        wavs = new_wavs
-        shuffle(wavs)
-        train += wavs[2:]
-        val += wavs[:2]
+        for file in os.listdir(f"{rootpath}/{speaker}"):
+            if file.endswith(".wav"):
+                file = file[:-4]
+                wave_path = f"{rootpath}/{speaker}/{file}.wav"
+                spec_path = f"{rootpath}/{speaker}/{file}.spec.pt"
+                soft_path = f"{rootpath}/{speaker}/{file}.wav.soft.pt"
+                f0_path = f"{rootpath}/{speaker}/{file}.wav.f0.npy"
+                assert os.path.isfile(wave_path), wave_path
+                assert os.path.isfile(spec_path), spec_path
+                assert os.path.isfile(soft_path), soft_path
+                assert os.path.isfile(f0_path), f0_path
+                all_items.append(
+                    f"{spk_id}|{wave_path}|{spec_path}|{soft_path}|{f0_path}")
+        shuffle(all_items)
+        train += all_items[2:]
+        val += all_items[:2]
 
     shuffle(train)
     shuffle(val)
             
     print("Writing", args.train_list)
     with open(args.train_list, "w") as f:
-        for fname in tqdm(train):
-            wavpath = fname
-            f.write(wavpath + "\n")
+        for line in tqdm(train):
+            item_paths = line
+            f.write(item_paths + "\n")
         
     print("Writing", args.val_list)
     with open(args.val_list, "w") as f:
-        for fname in tqdm(val):
-            wavpath = fname
-            f.write(wavpath + "\n")
+        for line in tqdm(val):
+            item_paths = line
+            f.write(item_paths + "\n")
 
     config_template["spk"] = spk_dict
     config_template["model"]["n_speakers"] = spk_id

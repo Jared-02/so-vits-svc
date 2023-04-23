@@ -22,7 +22,11 @@ from torch.cuda.amp import autocast, GradScaler
 
 import modules.commons as commons
 import utils
-from data_utils import TextAudioSpeakerLoader, TextAudioCollate
+from data_utils import (
+    TextAudioSpeakerLoader,
+    TextAudioCollate,
+    DistributedBucketSampler
+)
 from models import (
     SynthesizerTrn,
     MultiPeriodDiscriminator,
@@ -66,19 +70,41 @@ def run(rank, n_gpus, hps):
     dist.init_process_group(backend=  'gloo' if os.name == 'nt' else 'nccl', init_method='env://', world_size=n_gpus, rank=rank)
     torch.manual_seed(hps.train.seed)
     torch.cuda.set_device(rank)
-    collate_fn = TextAudioCollate()
+    
     all_in_mem = hps.train.all_in_mem   # If you have enough memory, turn on this option to avoid disk IO and speed up training.
     train_dataset = TextAudioSpeakerLoader(hps.data.training_files, hps, all_in_mem=all_in_mem)
-    num_workers = 5 if multiprocessing.cpu_count() > 4 else multiprocessing.cpu_count()
+    train_sampler = DistributedBucketSampler(
+        train_dataset,
+        hps.train.batch_size,
+        [50,200,400,500,600,700,800,1000,1300],
+        # ignore items <=0.58s >=15.09s (unit: hop length)
+        num_replicas=n_gpus,
+        rank=rank,
+        shuffle=True)
+    collate_fn = TextAudioCollate()
+
     if all_in_mem:
         num_workers = 0
-    train_loader = DataLoader(train_dataset, num_workers=num_workers, shuffle=False, pin_memory=True,
-                              batch_size=hps.train.batch_size, collate_fn=collate_fn)
+    elif multiprocessing.cpu_count() > 4:
+        num_workers = 8
+    else:
+        num_workers = multiprocessing.cpu_count()
+
+    train_loader = DataLoader(train_dataset,
+                              num_workers=num_workers,
+                              shuffle=False,
+                              pin_memory=True,
+                              collate_fn=collate_fn,
+                              batch_sampler=train_sampler)
     if rank == 0:
         eval_dataset = TextAudioSpeakerLoader(hps.data.validation_files, hps, all_in_mem=all_in_mem)
-        eval_loader = DataLoader(eval_dataset, num_workers=1, shuffle=False,
-                                 batch_size=1, pin_memory=False,
-                                 drop_last=False, collate_fn=collate_fn)
+        eval_loader = DataLoader(eval_dataset,
+                                 num_workers=num_workers,
+                                 shuffle=False,
+                                 batch_size=hps.train.batch_size,
+                                 pin_memory=False,
+                                 drop_last=False,
+                                 collate_fn=collate_fn)
 
     net_g = SynthesizerTrn(
         hps.data.filter_length // 2 + 1,
