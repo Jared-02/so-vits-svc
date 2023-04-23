@@ -184,12 +184,23 @@ class TextAudioCollate:
 
 class DistributedBucketSampler(torch.utils.data.distributed.DistributedSampler):
     """
-    Maintain similar input lengths in a batch.
-    Length groups are specified by boundaries.
-    Ex) boundaries = [b1, b2, b3] -> any batch is included either {x | b1 < length(x) <=b2} or {x | b2 < length(x) <= b3}.
-  
-    It removes samples which are not included in the boundaries.
-    Ex) boundaries = [b1, b2, b3] -> any x s.t. length(x) <= b1 or length(x) > b3 are discarded.
+    这是一个继承自 torch.utils.data.distributed.DistributedSampler 的 Python 类，使得同一个 batch 中多个输入音频的长度相似。长度组通过边界指定，例如 [b1, b2, b3]，每个 batch 都包含于 {x | b1 < length(x) <= b2} 或者 {x | b2 < length(x) <= b3} 中。它会丢弃不在边界内的样本，例如当边界为 [b1, b2, b3] 时，任何 length(x) <= b1 或 length(x) > b3 的数据将被忽略。
+
+    init(self, dataset, batch_size, boundaries, num_replicas=None, rank=None, shuffle=True) ：
+
+    参数：
+
+    dataset: 继承自 torch.utils.data.Dataset 的数据集
+    batch_size: int，每个 batch 大小
+    boundaries: list of int，边界列表
+    num_replicas: int or None，默认为 None，分布式训练时参与训练的 GPU 数
+    rank: int or None，默认为 None，当前 GPU ID
+    shuffle：bool，默认为 True，是否在 epoch 开始时进行洗牌
+
+    方法：
+
+    iter(self)：返回一个可迭代的 batch，其中每个 batch 的数据长度范围都在边界内。
+    len(self)：返回数据集中样本数量除以 batch 大小得到的结果值。
     """
     def __init__(self, dataset, batch_size, boundaries, num_replicas=None, rank=None, shuffle=True):
         super().__init__(dataset, num_replicas=num_replicas, rank=rank, shuffle=shuffle)
