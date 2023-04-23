@@ -29,7 +29,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     rootpath = args.source_dir
-    all_items = []
 
     train = []
     val = []
@@ -37,6 +36,7 @@ if __name__ == "__main__":
     spk_dict = {}
     spk_id = 0
     for speaker in tqdm(os.listdir(rootpath)):
+        items = []
         spk_dict[speaker] = spk_id
         for file in os.listdir(f"{rootpath}/{speaker}"):
             if file.endswith(".wav"):
@@ -46,12 +46,12 @@ if __name__ == "__main__":
                 soft_path = f"{rootpath}/{speaker}/{file}.wav.soft.pt"
                 f0_path = f"{rootpath}/{speaker}/{file}.wav.f0.npy"
                 assert os.path.isfile(wave_path), wave_path
-                all_items.append(
+                items.append(
                     f"{spk_id}|{wave_path}|{spec_path}|{soft_path}|{f0_path}")
         spk_id += 1
-        shuffle(all_items)
-        train += all_items[2:]
-        val += all_items[:2]
+        shuffle(items)
+        train += items[2:]
+        val += items[:2]
 
     shuffle(train)
     shuffle(val)
