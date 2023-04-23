@@ -51,7 +51,7 @@ class TextAudioSpeakerLoader(torch.utils.data.Dataset):
         
         self.all_in_mem = all_in_mem
         if self.all_in_mem:
-            self.cache = [self.get_items_pair(p[0]) for p in self.audiopaths]
+            self.cache = [self.get_items_pair(p) for p in self.audiopaths]
 
     def _filter(self):
         """
