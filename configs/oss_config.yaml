@@ -1,0 +1,6 @@
+AccessKey:
+  AccessKey_Id: yourAccessKeyId
+  AccessKey_Secret: yourAccessKeySecret
+Bucket:
+  Bucket_Name: examplebucket
+  Endpoint: https://oss-cn-hangzhou.aliyuncs.com

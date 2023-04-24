@@ -9,6 +9,10 @@ import subprocess
 import warnings
 import random
 import functools
+import oss2
+import yaml
+import tempfile
+from tqdm import tqdm
 
 import librosa
 import numpy as np
@@ -20,15 +24,36 @@ from hubert import hubert_model
 
 MATPLOTLIB_FLAG = False
 
-logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
-logger = logging
-
 f0_bin = 256
 f0_max = 1100.0
 f0_min = 50.0
 f0_mel_min = 1127 * np.log(1 + f0_min / 700)
 f0_mel_max = 1127 * np.log(1 + f0_max / 700)
 
+with open('configs/oss_config.yaml', 'r') as f:
+  oss_config = yaml.load(f, Loader=yaml.FullLoader)
+accesskey_id = oss_config['AccessKey']['AccessKey_Id']
+accesskey_secrt = oss_config['AccessKey']['AccessKey_Secret']
+endpoint_domain = oss_config['Bucket']['Endpoint']
+bucket_name = oss_config['Bucket']['Bucket_Name']
+auth = oss2.Auth(accesskey_id, accesskey_secrt)
+bucket = oss2.Bucket(auth, endpoint_domain, bucket_name)
+
+class TqdmUpTo(tqdm):
+  def update_to(self, bsize=1, tsize=None):
+    if tsize is not None:
+      self.total = tsize
+    return self.update(bsize - self.n)
+
+def osslogger_setting():
+  logging.getLogger('oss2.auth').setLevel(logging.WARNING)
+  logging.getLogger('oss2.api').setLevel(logging.WARNING)
+  logging.getLogger('oss2.http').setLevel(logging.WARNING)
+  logging.getLogger('oss2.resumable').setLevel(logging.WARNING)
+  logging.getLogger('urllib3.connectionpool').setLevel(logging.WARNING)
+
+logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
+logger = logging
 
 # def normalize_f0(f0, random_scale=True):
 #     f0_norm = f0.clone()  # create a copy of the input Tensor
@@ -309,7 +334,14 @@ def clean_checkpoints(path_to_models='logs/44k/', n_ckpts_to_keep=2, sort_by_tim
   to_del = [os.path.join(path_to_models, fn) for fn in
             (x_sorted('G')[:-n_ckpts_to_keep] + x_sorted('D')[:-n_ckpts_to_keep])]
   del_info = lambda fn: logger.info(f".. Free up space by deleting ckpt {fn}")
-  del_routine = lambda x: [os.remove(x), del_info(x)]
+  del_oss_info = lambda fn: logger.info(f".. deleting ckpt on oss {'/'.join(['backup', os.path.basename(fn)])}")
+  # Fix a issue due to global setting
+  osslogger_setting()
+  del_routine = lambda x: [os.remove(x),
+                           del_info(x),
+                           del_oss_info(x),
+                           bucket.delete_object('/'.join(['backup', os.path.basename(x)])) # aliyun oss delete
+                           ]
   rs = [del_routine(fn) for fn in to_del]
 
 def summarize(writer, global_step, scalars={}, histograms={}, images={}, audios={}, audio_sampling_rate=22050):

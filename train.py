@@ -291,6 +291,12 @@ def train_and_evaluate(rank, epoch, hps, nets, optims, schedulers, scaler, loade
                 keep_ckpts = getattr(hps.train, 'keep_ckpts', 0)
                 if keep_ckpts > 0:
                     utils.clean_checkpoints(path_to_models=hps.model_dir, n_ckpts_to_keep=keep_ckpts, sort_by_time=True)
+                utils.upload_logfiles(os.path.join(hps.model_dir), 'events',
+                                      'backup')
+                utils.upload_logfiles(os.path.join(hps.model_dir), 'train',
+                                      'backup')
+                utils.upload_logfiles(os.path.join(hps.model_dir, 'eval'),
+                                      'events', 'backup/eval')
 
         global_step += 1
 
