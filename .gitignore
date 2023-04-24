@@ -148,6 +148,7 @@ inference/chunks_temp.json
 logs
 hubert/checkpoint_best_legacy_500.pt
 configs/config.json
+configs/oss_config.yaml
 filelists/test.txt
 filelists/train.txt
 filelists/val.txt

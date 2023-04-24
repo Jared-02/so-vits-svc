@@ -316,6 +316,39 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
               'iteration': iteration,
               'optimizer': optimizer.state_dict(),
               'learning_rate': learning_rate}, checkpoint_path)
+  # Fix a issue due to global setting
+  osslogger_setting()
+  # aliyun oss upload
+  upload_filename = '/'.join(['backup',
+                              os.path.basename(checkpoint_path)])
+  with TqdmUpTo(unit='B', unit_scale=True, unit_divisor=1024,
+                desc=upload_filename, miniters=1) as t:
+    oss2.defaults.connection_pool_size = 8
+    oss2.resumable_upload(bucket, upload_filename, checkpoint_path,
+      store=oss2.ResumableStore(root=tempfile.gettempdir()),
+      multipart_threshold=1024*1024,
+      part_size=500*1024,
+      progress_callback=t.update_to,
+      num_threads=6)
+    t.total = t.n
+  logger.info(f"Saving model to aliyun oss {upload_filename}")
+
+def upload_logfiles(log_localpath: str, filename_prefix: str, log_osspath: str):
+  osslogger_setting()
+  logfiles = []
+  for f in os.listdir(log_localpath):
+    if f.startswith(filename_prefix):
+      logfiles.append(f)
+
+  for n in logfiles:
+    n_localpath = os.path.join(log_localpath, n)
+    n_osspath = '/'.join([log_osspath, n])
+    with open(n_localpath, 'rb') as fileobj:
+      with TqdmUpTo(unit='B', unit_scale=True, unit_divisor=1024, miniters=1) as t:
+        bucket.put_object(n_osspath, fileobj,
+                          progress_callback=t.update_to)
+        t.total = t.n
+    logger.info(f"Saving log to aliyun oss {n_localpath}")
 
 def clean_checkpoints(path_to_models='logs/44k/', n_ckpts_to_keep=2, sort_by_time=True):
   """Freeing up space by deleting saved ckpts
