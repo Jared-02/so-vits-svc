@@ -323,11 +323,11 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
                               os.path.basename(checkpoint_path)])
   with TqdmUpTo(unit='B', unit_scale=True, unit_divisor=1024,
                 desc=upload_filename, miniters=1) as t:
-    oss2.defaults.connection_pool_size = 8
+    oss2.defaults.connection_pool_size = 6
     oss2.resumable_upload(bucket, upload_filename, checkpoint_path,
       store=oss2.ResumableStore(root=tempfile.gettempdir()),
-      multipart_threshold=1024*1024,
-      part_size=500*1024,
+      multipart_threshold=20480*1024,
+      part_size=20480*1024,
       progress_callback=t.update_to,
       num_threads=6)
     t.total = t.n

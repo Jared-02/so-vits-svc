@@ -5,7 +5,13 @@ import tempfile
 import secrets
 import argparse
 import yaml
+import multiprocessing
 from tqdm import tqdm
+
+if multiprocessing.cpu_count() >= 8:
+    threads_used = 6
+else:
+    threads_used = multiprocessing.cpu_count() - 2
 
 def initialize(config_path: str):
     try:
@@ -66,17 +72,17 @@ def resumable_upload(upload_file_localpath: str):
     upload_filename = os.path.basename(upload_file_localpath)
     with TqdmUpTo(unit='B', unit_scale=True, unit_divisor=1024,
                   desc=upload_filename, miniters=1) as t:
-        oss2.defaults.connection_pool_size = 8
+        oss2.defaults.connection_pool_size = threads_used
         oss2.resumable_upload(bucket, upload_filename, upload_file_localpath,
             store=oss2.ResumableStore(root=tempfile.gettempdir()),
             # 设置分片上传阈值 multipart_threshold。默认值为 10 MB。
-            multipart_threshold=1024*1024,
+            multipart_threshold=20480*1024,
             # 设置分片大小，单位为字节，取值范围为 100 KB~5 GB。默认值为 100 KB。
-            part_size=500*1024,
+            part_size=1024*1024,
             # 设置上传回调进度函数。
             progress_callback=t.update_to,
             # 设置并发上传线程数 num_threads，需要将 oss2.defaults.connection_pool_size 设置为大于等于并发上传线程数。默认并发上传线程数为 1。
-            num_threads=6)
+            num_threads=threads_used)
         t.total = t.n
 
 def resumable_download(download_file: str, download_localpath:str):
@@ -86,27 +92,27 @@ def resumable_download(download_file: str, download_localpath:str):
                                                'Downloads', download_file)
     with TqdmUpTo(unit='B', unit_scale=True, unit_divisor=1024,
                   desc=download_file, miniters=1) as t:
-        oss2.defaults.connection_pool_size = 8
+        oss2.defaults.connection_pool_size = threads_used
         oss2.resumable_download(bucket, download_file, download_localpath,
             store=oss2.ResumableDownloadStore(root=tempfile.gettempdir()),
             # 设置分片下载阈值 multipart_threshold。默认值为 10 MB。
-            multiget_threshold=1024*1024,
+            multiget_threshold=20480*1024,
             # 设置分片大小，单位为字节，取值范围为100 KB~5 GB。默认值为100 KB。
-            part_size=100*1024,
+            part_size=20480*1024,
             # 设置下载进度回调函数。
             progress_callback=t.update_to,
             # 如果使用num_threads设置并发下载线程数，请将oss2.defaults.connection_pool_size设置为大于或等于并发下载线程数。默认并发下载线程数为1。
-            num_threads=4)
+            num_threads=threads_used)
         t.total = t.n
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config_path', type=str, default="configs/oss_config.yaml", help='Aliyun OSS config file path')
     parser.add_argument('-t', '--link_test', action='store_true', default=False, help='Test the link to Aliyun OSS')
-    parser.add_argument('-u', '--upload', type=str, default="dataset/dataset.zip", help='Upload file local path')
+    parser.add_argument('-u', '--upload', type=str, help='Upload file local path')
     parser.add_argument('-d', '--download', type=str, default="dataset.zip", help='Download file oss path')
     parser.add_argument('-dp', '--download_path', type=str, default="dataset.zip", help='Download file local path')
-    
+
     args = parser.parse_args()
     auth, bucket = initialize(args.config_path)
     if args.link_test:
